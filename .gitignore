@@ -1,0 +1,12 @@
+/*
+!/.gitignore
+!/README.md
+!/tools/
+/tools/*
+!/tools/*.py
+!/tools/plugin/
+/tools/plugin/*
+!/tools/plugin/main.c
+!/tools/plugin/exports.yml
+!/tools/plugin/build.sh
+!/tools/plugin/make.sh
