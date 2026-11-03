@@ -1,11 +1,30 @@
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from cyrmap import SLOTS
 from vtex import decode, encode
 
-CYR = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
-SAME = {"А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H", "О": "O", "Р": "P", "С": "C", "Т": "T", "Х": "X", "З": "3"}
 FONT = "/usr/share/fonts/liberation/LiberationSans-Bold.ttf"
+NARROW = 1.0
+
+
+def narrow(cell, k, pixel):
+    a = cell[..., 3]
+    xs = np.nonzero(a.max(0) > 8)[0]
+    if not len(xs):
+        return cell
+    x0, x1 = xs.min(), xs.max() + 1
+    gw = x1 - x0
+    nw = max(1, round(gw * k))
+    part = cell[:, x0:x1]
+    chans = [np.array(Image.fromarray(part[..., c]).resize((nw, part.shape[0]), Image.LANCZOS)) for c in range(4)]
+    g = np.stack(chans, -1)
+    if pixel:
+        g[..., 3] = np.where(g[..., 3] > 110, 255, 0)
+    res = np.zeros_like(cell)
+    ox = x0 + (gw - nw) // 2
+    res[:, ox : ox + nw] = g
+    return res
 
 
 def cell_of(ch):
@@ -31,17 +50,16 @@ def build(vita, styled=False, pixel=False):
         if len(xx):
             widths.append(xx.max() - xx.min() + 1)
     gw = int(np.median(widths))
+    mx, my = cell_of("M")
+    mcol = np.nonzero(alpha[my * chh : (my + 1) * chh, mx * cw : (mx + 1) * cw].max(0) > 64)[0]
+    mw = mcol.max() - mcol.min() + 1
     stroke_ref = np.mean([(r > 64).sum() for r in hcell[top:bot].T if (r > 64).any()])
     out = img.copy()
-    out[2 * chh : 3 * chh] = 0
     big = 8
     font = ImageFont.truetype(FONT, int((bot - top) * big * 1.38))
-    for i, ch in enumerate(CYR):
-        x0, y0 = i * cw, 2 * chh
-        if ch in SAME:
-            sx, sy = cell_of(SAME[ch])
-            out[y0 : y0 + chh, x0 : x0 + cw] = img[sy * chh : (sy + 1) * chh, sx * cw : (sx + 1) * cw]
-            continue
+    for ch, code in SLOTS.items():
+        x0, y0 = cell_of(code)
+        x0, y0 = x0 * cw, y0 * chh
         canvas = Image.new("L", (font.size * 2, font.size * 2), 0)
         ImageDraw.Draw(canvas).text((font.size // 2, font.size // 4), ch, font=font, fill=255)
         bb = canvas.getbbox()
@@ -56,7 +74,7 @@ def build(vita, styled=False, pixel=False):
             desc = (bb[3] - bb[1]) * scale - cap
         else:
             desc = 0
-        tw = gw * big * (1.25 if ch in "ЖШЩЮМ" else 1.0)
+        tw = big * (mw if ch in "ЖШЩЮЫ" else gw * 0.9 if ch in "ГЧУЭЬЪ" else gw)
         g = g.resize((max(1, int(tw)), max(1, int((bb[3] - bb[1]) * scale))), Image.LANCZOS)
         g = g.resize((max(1, g.width // big), max(1, g.height // big)), Image.LANCZOS)
         if g.width > cw - 2:
@@ -83,6 +101,10 @@ def build(vita, styled=False, pixel=False):
             cell[..., :3] = 255
             cell[oy : oy + hh, ox : ox + ww, 3] = m[:hh, :ww]
         out[y0 : y0 + chh, x0 : x0 + cw] = cell
+    for code in SLOTS.values():
+        x0, y0 = cell_of(code)
+        x0, y0 = x0 * cw, y0 * chh
+        out[y0 : y0 + chh, x0 : x0 + cw] = narrow(out[y0 : y0 + chh, x0 : x0 + cw], NARROW, pixel)
     res = out.copy()
     res[..., 3] = np.round(res[..., 3] * 128 / 255)
     return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGBA"), encode(Image.fromarray(np.clip(res, 0, 255).astype(np.uint8), "RGBA"), vita)

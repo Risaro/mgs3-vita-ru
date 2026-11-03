@@ -1,10 +1,11 @@
 import re
 from pathlib import Path
 
+from cyrmap import CODE
+
 ROOT = Path(__file__).resolve().parent.parent
 REPL = ROOT / "pc-rus/x/replacements_en_ru.txt"
 REGION = (0x960000, 0x990000)
-CYR = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
 
 MAIN = {
     "NEW GAME": "НОВАЯ ИГРА",
@@ -98,8 +99,8 @@ def encode(ru):
         ch = ASCII_FIX.get(ch, ch)
         for c in ch:
             u = c.upper()
-            if u in CYR:
-                out.append(0x60 + CYR.index(u))
+            if u in CODE:
+                out.append(CODE[u])
             elif 0x20 <= ord(u) < 0x60:
                 out.append(ord(u))
             else:

@@ -1,7 +1,6 @@
 #include <psp2/kernel/modulemgr.h>
 #include <taihen.h>
 #include "strings.h"
-#include "widths.h"
 #include "relocs.h"
 
 #define SEG0_LINK 0x81000000u
@@ -29,11 +28,6 @@ static uint32_t font_load_hook(void) {
         return TAI_CONTINUE(uint32_t, hook_ref);
     for (uint32_t i = 0; i < size; i++)
         buf[i] = font_raw[i];
-    for (uint32_t t = 0; t < WIDTH_PATCH_COUNT; t++) {
-        volatile uint8_t *w = (volatile uint8_t *)(width_patches[t].va + d1);
-        for (uint32_t j = 0; j < 32; j++)
-            w[j] = width_patches[t].data[j];
-    }
     for (uint32_t r = 0; r < RELOC_COUNT; r++)
         *(volatile uint32_t *)(relocs[r].va + d1) = (uint32_t)relocs[r].str;
     *(volatile uint32_t *)(FONT_PTR + d1) = (uint32_t)buf;
